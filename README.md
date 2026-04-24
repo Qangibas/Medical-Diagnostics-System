@@ -150,8 +150,3 @@ python train_mlflow.py
 uvicorn main:app --reload
 streamlit run streamlit_app.py
 ```
-
-## Notes
-
-- This project is for educational/demo use.
-- It does not replace clinical diagnosis.
