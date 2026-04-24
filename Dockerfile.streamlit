@@ -1,0 +1,17 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install Streamlit and requests
+RUN pip install --no-cache-dir streamlit==1.32.0 requests==2.31.0
+
+COPY streamlit_app.py .
+
+EXPOSE 8501
+
+# Disable CORS & XSRF for internal network use
+CMD ["streamlit", "run", "streamlit_app.py", \
+     "--server.port=8501", \
+     "--server.address=0.0.0.0", \
+     "--server.enableCORS=false", \
+     "--server.enableXsrfProtection=false"]

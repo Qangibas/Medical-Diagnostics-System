@@ -1,0 +1,85 @@
+services:
+
+  # MLflow - built locally from Dockerfile.mlflow (no ghcr.io image needed)
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
+    container_name: mlflow_server
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    networks:
+      - ml_network
+
+  # Training job - runs once then exits
+  trainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.trainer
+    container_name: model_trainer
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    volumes:
+      - model_data:/app/model
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    networks:
+      - ml_network
+    restart: "no"
+
+  # FastAPI prediction service
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi_app
+    ports:
+      - "8000:8000"
+    depends_on:
+      trainer:
+        condition: service_completed_successfully
+    volumes:
+      - model_data:/app/model
+    environment:
+      - MODEL_PATH=/app/model/model.joblib
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ml_network
+
+  # Streamlit frontend
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: streamlit_app
+    ports:
+      - "8501:8501"
+    depends_on:
+      fastapi:
+        condition: service_healthy
+    environment:
+      - FASTAPI_URL=http://fastapi:8000
+    networks:
+      - ml_network
+
+volumes:
+  mlflow_data:
+  model_data:
+
+networks:
+  ml_network:
+    driver: bridge
